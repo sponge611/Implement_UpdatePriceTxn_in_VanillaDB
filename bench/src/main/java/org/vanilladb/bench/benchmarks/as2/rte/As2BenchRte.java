@@ -20,20 +20,64 @@ import org.vanilladb.bench.benchmarks.as2.As2BenchTxnType;
 import org.vanilladb.bench.remote.SutConnection;
 import org.vanilladb.bench.rte.RemoteTerminalEmulator;
 
+//import this for read the read/write ratio specified in vanillabench.property
+import org.vanilladb.bench.util.BenchProperties;
+
 public class As2BenchRte extends RemoteTerminalEmulator<As2BenchTxnType> {
 	
 	private As2BenchTxExecutor executor;
-
+	
+	//Add a As2BenchTxExecutor for UPDATE_ITEM
+	private As2BenchTxExecutor executor_for_update;
+	
+	//Record read/write ratio
+	public static final double READ_RATIO = BenchProperties.getLoader().getPropertyAsDouble(As2BenchRte.class.getName() + ".READ_RATIO", 1.0);
+	public static final double WRITE_RATIO = BenchProperties.getLoader().getPropertyAsDouble(As2BenchRte.class.getName() + ".WRITE_RATIO", 0.0);
+	//A counter for decide which Transaction should be done base on the read write ratio
+	private int counter;
 	public As2BenchRte(SutConnection conn, StatisticMgr statMgr) {
 		super(conn, statMgr);
 		executor = new As2BenchTxExecutor(new As2ReadItemParamGen());
+		executor_for_update = new As2BenchTxExecutor(new As2UpdateItemParamGen());
+		counter = 0;
 	}
 	
 	protected As2BenchTxnType getNextTxType() {
-		return As2BenchTxnType.READ_ITEM;
+		int read_times = (int)(READ_RATIO*10);
+		/*int write_times = (int)(WRITE_RATIO*10);*/
+		if(READ_RATIO == 1.0) {
+			return As2BenchTxnType.READ_ITEM;
+		}
+		else if(WRITE_RATIO == 1.0) {
+			return As2BenchTxnType.UPDATE_ITEM;
+		}
+		else if(counter < read_times) {
+			counter++;
+			return As2BenchTxnType.READ_ITEM;
+		}
+		else {
+			//for write type transactions
+			counter++;
+			counter = counter % 10;
+			return As2BenchTxnType.UPDATE_ITEM;
+		}
+		/*else if(counter-read_times < write_times-1) {
+			counter++;
+			return As2BenchTxnType.UPDATE_ITEM;
+		}
+		else {
+			counter = 0;
+			return As2BenchTxnType.UPDATE_ITEM;
+		}*/
 	}
 	
 	protected As2BenchTxExecutor getTxExeutor(As2BenchTxnType type) {
-		return executor;
+	
+		if (type == As2BenchTxnType.READ_ITEM)
+			return executor;
+		else if(type == As2BenchTxnType.UPDATE_ITEM)
+			return executor_for_update;
+		else
+			return executor;
 	}
 }
