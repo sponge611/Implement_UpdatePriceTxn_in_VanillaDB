@@ -42,7 +42,8 @@ public class UpdateItemPriceTxnJdbcJob implements JdbcJob {
 		for (int i = 0; i < readCount; i++)
 			itemIds[i] = (Integer) pars[i + 1];
 		for (int i = 0; i < readCount; i++)
-			raise_value[i] = (Double) pars[readCount + i + 1];
+			raise_value[i] = (double) pars[i + 1 + readCount];
+
 		double origin_price = 0.00;
 		double update_price = 0.00;
 		
