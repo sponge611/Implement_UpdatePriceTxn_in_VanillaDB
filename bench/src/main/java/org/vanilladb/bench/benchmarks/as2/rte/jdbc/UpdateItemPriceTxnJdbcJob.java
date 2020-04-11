@@ -34,8 +34,7 @@ public class UpdateItemPriceTxnJdbcJob implements JdbcJob {
 	@Override
 	public SutResultSet execute(Connection conn, Object[] pars) throws SQLException {
 		// Parse parameters
-		if(logger.isLoggable(Level.INFO))
-			logger.info("pars's size:" + pars.length);
+		
 		int readCount = (Integer) pars[0];
 		int[] itemIds = new int[readCount];
 		double[] raise_value = new double[readCount];
@@ -55,7 +54,7 @@ public class UpdateItemPriceTxnJdbcJob implements JdbcJob {
 			Statement statement = conn.createStatement();
 			ResultSet rs = null;
 			for (int i = 0; i < 10; i++) {
-				String sql = "SELECT i_name i_price FROM item WHERE i_id = " + itemIds[i];
+				String sql = "SELECT i_name, i_price FROM item WHERE i_id = " + itemIds[i];
 	
 				rs = statement.executeQuery(sql);
 				rs.beforeFirst();
