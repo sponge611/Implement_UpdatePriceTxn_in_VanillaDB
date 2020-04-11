@@ -36,11 +36,11 @@ public class UpdateItemPriceTxnJdbcJob implements JdbcJob {
 		// Parse parameters
 		int readCount = (Integer) pars[0];
 		int[] itemIds = new int[readCount];
-		int[] raise_value = new int[readCount];
+		double[] raise_value = new double[readCount];
 		for (int i = 0; i < readCount; i++)
 			itemIds[i] = (Integer) pars[i + 1];
-		for (int i = readCount; i < 2*readCount; i++)
-			raise_value[i] = (Integer) pars[i + 1];
+		for (int i = 0; i < readCount; i++)
+			raise_value[i] = (double) pars[i + 1 + readCount];
 		double origin_price = 0.00;
 		
 		// Output message
