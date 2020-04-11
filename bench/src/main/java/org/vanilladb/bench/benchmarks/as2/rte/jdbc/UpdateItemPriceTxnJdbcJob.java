@@ -34,14 +34,17 @@ public class UpdateItemPriceTxnJdbcJob implements JdbcJob {
 	@Override
 	public SutResultSet execute(Connection conn, Object[] pars) throws SQLException {
 		// Parse parameters
+		if(logger.isLoggable(Level.INFO))
+			logger.info("pars's size:" + pars.length);
 		int readCount = (Integer) pars[0];
 		int[] itemIds = new int[readCount];
-		int[] raise_value = new int[readCount];
+		double[] raise_value = new double[readCount];
 		for (int i = 0; i < readCount; i++)
 			itemIds[i] = (Integer) pars[i + 1];
-		for (int i = readCount; i < 2*readCount; i++)
-			raise_value[i] = (Integer) pars[i + 1];
+		for (int i = 0; i < readCount; i++)
+			raise_value[i] = (Double) pars[readCount + i + 1];
 		double origin_price = 0.00;
+		double update_price = 0.00;
 		
 		// Output message
 		StringBuilder outputMsg = new StringBuilder("[");
@@ -58,11 +61,12 @@ public class UpdateItemPriceTxnJdbcJob implements JdbcJob {
 				if (rs.next()) {					
 					outputMsg.append(String.format("'%s', ", rs.getString("i_name")));
 					origin_price = rs.getDouble("i_price");
+					update_price = origin_price + raise_value[i];
 					
 					if( rs.getDouble("i_price")>As2BenchConstants.MAX_PRICE) 
-						sql = "UPDATE item set i_price= " + As2BenchConstants.MIN_PRICE;		
+						sql = "UPDATE item SET i_price = " + As2BenchConstants.MIN_PRICE;		
 					else
-						sql = "UPDATE item set i_price= " +origin_price + raise_value[i];
+						sql = "UPDATE item SET i_price = " + update_price;
 					sql += " WHERE i_id = " + itemIds[i];
 					
 					if (statement.executeUpdate(sql) == 0) 
