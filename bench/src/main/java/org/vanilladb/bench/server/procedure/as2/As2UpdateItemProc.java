@@ -24,7 +24,7 @@ public class As2UpdateItemProc extends StoredProcedure<UpdateItemProcParamHelper
 			int iid = paramHelper.getUpdateItemId(idx);
 			double raise_price = paramHelper.getUpdateItemPrice(idx);
 			Plan p = VanillaDb.newPlanner().createQueryPlan(
-					"SELECT i_price FROM item WHERE i_id = " + iid, tx);
+					"SELECT i_name, i_price FROM item WHERE i_id = " + iid, tx);
 			Scan s = p.open();
 			
 			s.beforeFirst();
@@ -32,17 +32,20 @@ public class As2UpdateItemProc extends StoredProcedure<UpdateItemProcParamHelper
 				
 				origin_price = (Double) s.getVal("i_price").asJavaVal();
 				update_price = origin_price + raise_price;
+				paramHelper.setItemName("updated_"+(String) s.getVal("i_name").asJavaVal(), idx);
 				if(origin_price > As2BenchConstants.MAX_PRICE) {
 					if(VanillaDb.newPlanner().executeUpdate(
-							"UPDATE item SET i_price = " + As2BenchConstants.MIN_PRICE + " WHERE i_id = " + iid, tx) != 1) {
+							"UPDATE item SET i_price = " + As2BenchConstants.MIN_PRICE + " WHERE i_id = " + iid, tx) <= 0) {
 						throw new RuntimeException("Update Item Price Fail: Could not update item with i_id = " + iid);
 					}
+					paramHelper.setItemPrice(As2BenchConstants.MIN_PRICE, idx);
 				}
 				else {
 					if(VanillaDb.newPlanner().executeUpdate(
-							"UPDATE item SET i_price = " + update_price + " WHERE i_id = " + iid, tx) != 1) {
+							"UPDATE item SET i_price = " + update_price + " WHERE i_id = " + iid, tx) <= 0) {
 						throw new RuntimeException("Update Item Price Fail: Could not update item with i_id = " + iid);
 					}
+					paramHelper.setItemPrice(update_price, idx);
 					
 				}
 			} else
@@ -50,5 +53,6 @@ public class As2UpdateItemProc extends StoredProcedure<UpdateItemProcParamHelper
 
 			s.close();
 		}
+	
 	}
 }

@@ -26,7 +26,7 @@ public class As2UpdateItemParamGen implements TxParamGenerator<As2BenchTxnType> 
 		for (int i = 0; i < UPDATE_COUNT; i++)
 			paramList.add(rvg.number(1, As2BenchConstants.NUM_ITEMS));
 		for (int i = 0; i < UPDATE_COUNT; i++)
-			paramList.add(rvg.randomDoubleIncrRange(0.0,5.0,1.0));
+			paramList.add(rvg.randomDoubleIncrRange(0.0,5.0,0.1));
 		return paramList.toArray();
 	}
 }
