@@ -69,7 +69,7 @@ public class UpdateItemPriceTxnJdbcJob implements JdbcJob {
 						sql = "UPDATE item SET i_price = " + update_price;
 					sql += " WHERE i_id = " + itemIds[i];
 					
-					if (statement.executeUpdate(sql) == 0) 
+					if (statement.executeUpdate(sql) <= 0)
 						throw new RuntimeException("cannot find the record with i_id = " + itemIds[i]);
 
 				} else

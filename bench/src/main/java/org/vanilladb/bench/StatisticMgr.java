@@ -31,6 +31,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.Arrays;
 
 import org.vanilladb.bench.util.BenchProperties;
 
@@ -120,6 +121,7 @@ public class StatisticMgr {
 				fileName += "-" + fileNamePostfix; // E.g. "20200524-200824-postfix"
 			
 			outputDetailReport(fileName);
+			outputCSVReport(fileName);
 			
 			
 		} catch (IOException e) {
@@ -175,14 +177,22 @@ public class StatisticMgr {
 				int abortedCount = abortedCounts.get(entry.getKey());
 				abortedTotal += abortedCount;
 				long avgResTimeMs = 0;
+				//long avgResTimeUs = 0;
+				//long avgResTimeNs = 0;
 				
 				if (value.txnCount > 0) {
 					avgResTimeMs = TimeUnit.NANOSECONDS.toMillis(
 							value.getTotalResponseTime() / value.txnCount);
+					//avgResultUs = TimeUnit.NANOSECONDS.toMicro(value.getTotalResponseTime() / value.txnCount);
+					//avgResTimeNs = value.getTotalResponseTime() / value.txnCount;
 				}
 				
 				writer.write(value.getmType() + " - committed: " + value.getTxnCount() +
 						", aborted: " + abortedCount + ", avg latency: " + avgResTimeMs + " ms");
+				/*writer.write(value.getmType() + " - committed: " + value.getTxnCount() +
+				", aborted: " + abortedCount + ", avg latency: " + avgResTimeUs + " us");*/
+				/*writer.write(value.getmType() + " - committed: " + value.getTxnCount() +
+						", aborted: " + abortedCount + ", avg latency: " + avgResTimeNs + " ns");*/
 				writer.newLine();
 			}
 			
@@ -196,6 +206,121 @@ public class StatisticMgr {
 			writer.write(String.format("TOTAL - committed: %d, aborted: %d, avg latency: %d ms", 
 					finishedCount, abortedTotal, Math.round(avgResTimeMs / 1000000)));
 		}
+	}
+	
+	private void outputCSVReport(String fileName) throws IOException{
+		
+		
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(OUTPUT_DIR, fileName + ".csv")))) {
+			// First line:  units
+			writer.write("time(sec), throughput(txs), avg_latency(ms), min(ms), max(ms), 25th_lat(ms), median_lat(ms), 75th_lat(ms)");
+			writer.newLine();
+			
+			// Detail latency report
+			int counted_txn = 0;
+			int time_sec = 0;
+			while(counted_txn < resultSets.size()) {
+				if(resultSets.get(counted_txn).isTxnIsCommited()) {
+					List<TxnResultSet> in_period_resultSets = new ArrayList<TxnResultSet>();
+					in_period_resultSets.add(resultSets.get(counted_txn));
+					long period_start = resultSets.get(counted_txn).getTxnEndTime();
+					long period_end = resultSets.get(counted_txn).getTxnEndTime();
+					counted_txn++;
+					while(TimeUnit.NANOSECONDS.toSeconds(period_end - period_start) < 5 && counted_txn < resultSets.size()){
+						if(resultSets.get(counted_txn).isTxnIsCommited()) {
+							in_period_resultSets.add(resultSets.get(counted_txn));
+							period_end = resultSets.get(counted_txn).getTxnEndTime();
+							counted_txn++;
+							
+						}
+						else {
+							counted_txn++;
+						}
+					}
+					long [] restime_in_period = new long[in_period_resultSets.size()];
+					long totalResTimeMs = 0;
+					long avgResTimeMs = 0;
+					long minResTimeMs= 0;
+					long maxResTimeMs = 0;
+					long first_quar_ResTimeMs = 0;
+					long median_ResTimeMs = 0;
+					long third_quar_ResTimeMs = 0;
+					for(int i = 0; i < in_period_resultSets.size(); i++) {
+						restime_in_period[i] = in_period_resultSets.get(i).getTxnResponseTime();
+						totalResTimeMs += in_period_resultSets.get(i).getTxnResponseTime();
+					}
+					Arrays.sort(restime_in_period);
+					
+					
+					
+					//decide avg latency
+					avgResTimeMs = TimeUnit.NANOSECONDS.toMillis(totalResTimeMs / in_period_resultSets.size());
+					//decide min 
+					minResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[0]);
+					//decide max
+					maxResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[in_period_resultSets.size()-1]);
+						
+					if(in_period_resultSets.size() % 2 == 0) {
+						//pivot shows the index of the median number, for example {3,5,7,9} pivot = 1, median = (5+7) / 2
+						int pivot = in_period_resultSets.size()/2 - 1;
+						//decide median
+						median_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+						
+						if(in_period_resultSets.size()%4 == 0 ) {
+							pivot = in_period_resultSets.size()/4 - 1;
+							//decide 25th latency
+							first_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+							//decide 75th latency
+							pivot = in_period_resultSets.size()*3/4 - 1;
+							third_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+							
+						}
+						else {
+							//decide 25th latency
+							pivot = in_period_resultSets.size()/4;
+							first_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+							//decide 75th latency
+							pivot = in_period_resultSets.size()*3/4;
+							third_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+						}
+					
+					
+					}
+					else {
+						int pivot = in_period_resultSets.size()/2;
+						//decide median
+						median_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+						if((in_period_resultSets.size()-1)%4 == 0) {
+							//decide 25th latency
+							pivot = in_period_resultSets.size()/4 - 1;
+							first_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+							//decide 75th latency
+							pivot = in_period_resultSets.size()*3/4;
+							third_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+							
+						}
+						else{
+							//decide 25th latency
+							pivot = in_period_resultSets.size()/4;
+							first_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+							//decide 75th latency
+							pivot = in_period_resultSets.size()*3/4;
+							third_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+						}
+					}
+					time_sec += 5;
+					writer.write(time_sec + ", " + in_period_resultSets.size() + ", " + avgResTimeMs + ", "
+							+ minResTimeMs + ", " + maxResTimeMs + ", " + first_quar_ResTimeMs + ", " + median_ResTimeMs + ", " + third_quar_ResTimeMs);
+					writer.newLine();
+					
+					
+				}
+				else {
+					counted_txn++;
+				}
+			}
+		}	
+		
 	}
 	
 	
