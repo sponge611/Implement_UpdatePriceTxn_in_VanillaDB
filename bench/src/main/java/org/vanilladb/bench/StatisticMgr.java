@@ -179,7 +179,7 @@ public class StatisticMgr {
 				int abortedCount = abortedCounts.get(entry.getKey());
 				abortedTotal += abortedCount;
 				//long avgResTimeMs = 0;
-				long avgResTimeUs = 0;
+				long avgResTimeUs = 0L;
 				//long avgResTimeNs = 0;
 				
 				if (value.txnCount > 0) {
@@ -198,7 +198,7 @@ public class StatisticMgr {
 				writer.newLine();
 			}
 			
-			// Last line: Total statistics
+			/*// Last line: Total statistics
 			int finishedCount = resultSets.size() - abortedTotal;
 			//double avgResTimeMs = 0;
 			double avgResTimeUs = 0;
@@ -207,7 +207,19 @@ public class StatisticMgr {
 					avgResTimeUs += rs.getTxnResponseTime() / finishedCount;
 			}
 			writer.write(String.format("TOTAL - committed: %d, aborted: %d, avg latency: %d us", 
-					finishedCount, abortedTotal, Math.round(avgResTimeUs / 1000)));
+					finishedCount, abortedTotal, Math.round(avgResTimeUs / 1000)));*/
+			
+			// Last line: Total statistics
+			int finishedCount = resultSets.size() - abortedTotal;
+			//double avgResTimeMs = 0;
+			long avgResTimeUs = 0L;
+			if (finishedCount > 0) { // Avoid "Divide By Zero"
+				for (TxnResultSet rs : resultSets)
+					avgResTimeUs += TimeUnit.NANOSECONDS.toMicros(rs.getTxnResponseTime());
+			}
+			avgResTimeUs = avgResTimeUs / finishedCount;
+			writer.write(String.format("TOTAL - committed: %d, aborted: %d, avg latency: %d us", 
+								finishedCount, abortedTotal, avgResTimeUs));
 		}
 	}
 	
@@ -222,6 +234,7 @@ public class StatisticMgr {
 			// Detail latency report
 			int counted_txn = 0;
 			int time_sec = 0;
+			long period_Nanosecs = 5000000000L;
 			while(counted_txn < resultSets.size()) {
 				if(resultSets.get(counted_txn).isTxnIsCommited()) {
 					List<TxnResultSet> in_period_resultSets = new ArrayList<TxnResultSet>();
@@ -229,11 +242,11 @@ public class StatisticMgr {
 					long period_start = resultSets.get(counted_txn).getTxnEndTime();
 					long period_end = resultSets.get(counted_txn).getTxnEndTime();
 					counted_txn++;
-					while(TimeUnit.NANOSECONDS.toMicros(period_end - period_start) <= 5000000 && counted_txn < resultSets.size()){
+					while(period_end - period_start <= period_Nanosecs && counted_txn < resultSets.size()){
 						if(resultSets.get(counted_txn).isTxnIsCommited()) {
 							//in_period_resultSets.add(resultSets.get(counted_txn));
 							period_end = resultSets.get(counted_txn).getTxnEndTime();
-							if(TimeUnit.NANOSECONDS.toMicros(period_end - period_start) > 5000000) {
+							if(period_end - period_start > period_Nanosecs) {
 								break;
 							}
 							else {
@@ -247,13 +260,13 @@ public class StatisticMgr {
 						}
 					}
 					long [] restime_in_period = new long[in_period_resultSets.size()];
-					long totalResTimeUs = 0;
-					long avgResTimeUs = 0;
-					long minResTimeUs= 0;
-					long maxResTimeUs = 0;
-					long first_quar_ResTimeUs = 0;
-					long median_ResTimeUs = 0;
-					long third_quar_ResTimeUs = 0;
+					long totalResTimeUs = 0L;
+					long avgResTimeUs = 0L;
+					long minResTimeUs= 0L;
+					long maxResTimeUs = 0L;
+					long first_quar_ResTimeUs = 0L;
+					long median_ResTimeUs = 0L;
+					long third_quar_ResTimeUs = 0L;
 					for(int i = 0; i < in_period_resultSets.size(); i++) {
 						restime_in_period[i] = in_period_resultSets.get(i).getTxnResponseTime();
 						totalResTimeUs += in_period_resultSets.get(i).getTxnResponseTime();
