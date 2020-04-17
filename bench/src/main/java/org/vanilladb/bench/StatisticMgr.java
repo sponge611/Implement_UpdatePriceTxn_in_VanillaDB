@@ -150,8 +150,10 @@ public class StatisticMgr {
 			for (TxnResultSet resultSet : resultSets) {
 				if (resultSet.isTxnIsCommited()) {
 					// Write a line: {[Tx Type]: [Latency]}
+					/*writer.write(resultSet.getTxnType() + ": "
+							+ TimeUnit.NANOSECONDS.toMillis(resultSet.getTxnResponseTime()) + " ms");*/
 					writer.write(resultSet.getTxnType() + ": "
-							+ TimeUnit.NANOSECONDS.toMillis(resultSet.getTxnResponseTime()) + " ms");
+							+ TimeUnit.NANOSECONDS.toMicros(resultSet.getTxnResponseTime()) + " us");
 					writer.newLine();
 					
 					// Count transaction for each type
@@ -176,21 +178,21 @@ public class StatisticMgr {
 				TxnStatistic value = entry.getValue();
 				int abortedCount = abortedCounts.get(entry.getKey());
 				abortedTotal += abortedCount;
-				long avgResTimeMs = 0;
-				//long avgResTimeUs = 0;
+				//long avgResTimeMs = 0;
+				long avgResTimeUs = 0;
 				//long avgResTimeNs = 0;
 				
 				if (value.txnCount > 0) {
-					avgResTimeMs = TimeUnit.NANOSECONDS.toMillis(
-							value.getTotalResponseTime() / value.txnCount);
-					//avgResultUs = TimeUnit.NANOSECONDS.toMicro(value.getTotalResponseTime() / value.txnCount);
+					/*avgResTimeMs = TimeUnit.NANOSECONDS.toMillis(
+							value.getTotalResponseTime() / value.txnCount);*/
+					avgResTimeUs = TimeUnit.NANOSECONDS.toMicros(value.getTotalResponseTime() / value.txnCount);
 					//avgResTimeNs = value.getTotalResponseTime() / value.txnCount;
 				}
 				
-				writer.write(value.getmType() + " - committed: " + value.getTxnCount() +
-						", aborted: " + abortedCount + ", avg latency: " + avgResTimeMs + " ms");
 				/*writer.write(value.getmType() + " - committed: " + value.getTxnCount() +
-				", aborted: " + abortedCount + ", avg latency: " + avgResTimeUs + " us");*/
+						", aborted: " + abortedCount + ", avg latency: " + avgResTimeMs + " ms");*/
+				writer.write(value.getmType() + " - committed: " + value.getTxnCount() +
+				", aborted: " + abortedCount + ", avg latency: " + avgResTimeUs + " us");
 				/*writer.write(value.getmType() + " - committed: " + value.getTxnCount() +
 						", aborted: " + abortedCount + ", avg latency: " + avgResTimeNs + " ns");*/
 				writer.newLine();
@@ -198,13 +200,14 @@ public class StatisticMgr {
 			
 			// Last line: Total statistics
 			int finishedCount = resultSets.size() - abortedTotal;
-			double avgResTimeMs = 0;
+			//double avgResTimeMs = 0;
+			double avgResTimeUs = 0;
 			if (finishedCount > 0) { // Avoid "Divide By Zero"
 				for (TxnResultSet rs : resultSets)
-					avgResTimeMs += rs.getTxnResponseTime() / finishedCount;
+					avgResTimeUs += rs.getTxnResponseTime() / finishedCount;
 			}
-			writer.write(String.format("TOTAL - committed: %d, aborted: %d, avg latency: %d ms", 
-					finishedCount, abortedTotal, Math.round(avgResTimeMs / 1000000)));
+			writer.write(String.format("TOTAL - committed: %d, aborted: %d, avg latency: %d us", 
+					finishedCount, abortedTotal, Math.round(avgResTimeUs / 1000)));
 		}
 	}
 	
@@ -213,7 +216,7 @@ public class StatisticMgr {
 		
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(OUTPUT_DIR, fileName + ".csv")))) {
 			// First line:  units
-			writer.write("time(sec), throughput(txs), avg_latency(ms), min(ms), max(ms), 25th_lat(ms), median_lat(ms), 75th_lat(ms)");
+			writer.write("time(sec), throughput(txs), avg_latency(us), min(us), max(us), 25th_lat(us), median_lat(us), 75th_lat(us)");
 			writer.newLine();
 			
 			// Detail latency report
@@ -226,11 +229,17 @@ public class StatisticMgr {
 					long period_start = resultSets.get(counted_txn).getTxnEndTime();
 					long period_end = resultSets.get(counted_txn).getTxnEndTime();
 					counted_txn++;
-					while(TimeUnit.NANOSECONDS.toSeconds(period_end - period_start) < 5 && counted_txn < resultSets.size()){
+					while(TimeUnit.NANOSECONDS.toMicros(period_end - period_start) <= 5000000 && counted_txn < resultSets.size()){
 						if(resultSets.get(counted_txn).isTxnIsCommited()) {
-							in_period_resultSets.add(resultSets.get(counted_txn));
+							//in_period_resultSets.add(resultSets.get(counted_txn));
 							period_end = resultSets.get(counted_txn).getTxnEndTime();
-							counted_txn++;
+							if(TimeUnit.NANOSECONDS.toMicros(period_end - period_start) > 5000000) {
+								break;
+							}
+							else {
+								in_period_resultSets.add(resultSets.get(counted_txn));
+								counted_txn++;
+							}
 							
 						}
 						else {
@@ -238,50 +247,50 @@ public class StatisticMgr {
 						}
 					}
 					long [] restime_in_period = new long[in_period_resultSets.size()];
-					long totalResTimeMs = 0;
-					long avgResTimeMs = 0;
-					long minResTimeMs= 0;
-					long maxResTimeMs = 0;
-					long first_quar_ResTimeMs = 0;
-					long median_ResTimeMs = 0;
-					long third_quar_ResTimeMs = 0;
+					long totalResTimeUs = 0;
+					long avgResTimeUs = 0;
+					long minResTimeUs= 0;
+					long maxResTimeUs = 0;
+					long first_quar_ResTimeUs = 0;
+					long median_ResTimeUs = 0;
+					long third_quar_ResTimeUs = 0;
 					for(int i = 0; i < in_period_resultSets.size(); i++) {
 						restime_in_period[i] = in_period_resultSets.get(i).getTxnResponseTime();
-						totalResTimeMs += in_period_resultSets.get(i).getTxnResponseTime();
+						totalResTimeUs += in_period_resultSets.get(i).getTxnResponseTime();
 					}
 					Arrays.sort(restime_in_period);
 					
 					
 					
 					//decide avg latency
-					avgResTimeMs = TimeUnit.NANOSECONDS.toMillis(totalResTimeMs / in_period_resultSets.size());
+					avgResTimeUs = TimeUnit.NANOSECONDS.toMicros(totalResTimeUs / in_period_resultSets.size());
 					//decide min 
-					minResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[0]);
+					minResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[0]);
 					//decide max
-					maxResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[in_period_resultSets.size()-1]);
+					maxResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[in_period_resultSets.size()-1]);
 						
 					if(in_period_resultSets.size() % 2 == 0) {
 						//pivot shows the index of the median number, for example {3,5,7,9} pivot = 1, median = (5+7) / 2
 						int pivot = in_period_resultSets.size()/2 - 1;
 						//decide median
-						median_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+						median_ResTimeUs = TimeUnit.NANOSECONDS.toMicros((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
 						
 						if(in_period_resultSets.size()%4 == 0 ) {
 							pivot = in_period_resultSets.size()/4 - 1;
 							//decide 25th latency
-							first_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+							first_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
 							//decide 75th latency
 							pivot = in_period_resultSets.size()*3/4 - 1;
-							third_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+							third_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
 							
 						}
 						else {
 							//decide 25th latency
 							pivot = in_period_resultSets.size()/4;
-							first_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+							first_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
 							//decide 75th latency
 							pivot = in_period_resultSets.size()*3/4;
-							third_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+							third_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
 						}
 					
 					
@@ -289,28 +298,28 @@ public class StatisticMgr {
 					else {
 						int pivot = in_period_resultSets.size()/2;
 						//decide median
-						median_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+						median_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
 						if((in_period_resultSets.size()-1)%4 == 0) {
 							//decide 25th latency
 							pivot = in_period_resultSets.size()/4 - 1;
-							first_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+							first_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
 							//decide 75th latency
 							pivot = in_period_resultSets.size()*3/4;
-							third_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
+							third_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros((restime_in_period[pivot] + restime_in_period[pivot+1])/2);
 							
 						}
 						else{
 							//decide 25th latency
 							pivot = in_period_resultSets.size()/4;
-							first_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+							first_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
 							//decide 75th latency
 							pivot = in_period_resultSets.size()*3/4;
-							third_quar_ResTimeMs = TimeUnit.NANOSECONDS.toMillis(restime_in_period[pivot]);
+							third_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
 						}
 					}
 					time_sec += 5;
-					writer.write(time_sec + ", " + in_period_resultSets.size() + ", " + avgResTimeMs + ", "
-							+ minResTimeMs + ", " + maxResTimeMs + ", " + first_quar_ResTimeMs + ", " + median_ResTimeMs + ", " + third_quar_ResTimeMs);
+					writer.write(time_sec + ", " + in_period_resultSets.size() + ", " + avgResTimeUs + ", "
+							+ minResTimeUs + ", " + maxResTimeUs + ", " + first_quar_ResTimeUs + ", " + median_ResTimeUs + ", " + third_quar_ResTimeUs);
 					writer.newLine();
 					
 					
