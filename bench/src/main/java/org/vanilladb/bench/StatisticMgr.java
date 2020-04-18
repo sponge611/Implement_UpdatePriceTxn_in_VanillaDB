@@ -308,7 +308,7 @@ public class StatisticMgr {
 					
 					
 					}
-					else {
+					else if(in_period_resultSets.size() > 1){
 						int pivot = in_period_resultSets.size()/2;
 						//decide median
 						median_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
@@ -329,6 +329,13 @@ public class StatisticMgr {
 							pivot = in_period_resultSets.size()*3/4;
 							third_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
 						}
+					}
+					else {
+						int pivot = 0;
+						median_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
+						first_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
+						third_quar_ResTimeUs = TimeUnit.NANOSECONDS.toMicros(restime_in_period[pivot]);
+						
 					}
 					time_sec += 5;
 					writer.write(time_sec + ", " + in_period_resultSets.size() + ", " + avgResTimeUs + ", "
